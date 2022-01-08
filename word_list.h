@@ -1,5 +1,26 @@
 #include <vector>
 #include <string>
+#include <algorithm>
+
+constexpr size_t word_length = 5;
+struct Word {
+  Word(const char tmp[6]) { std::copy(tmp, tmp+word_length, data); }
+  char data[word_length]; 
+
+  bool contains(char c) const {
+    for (int i = 0; i < word_length; i++) {
+      if (c == data[i]) { return true; }
+    }
+    return false;
+  }
+
+  int find(char c) const {
+    for (int i = 0; i < word_length; i++) {
+      if (c == data[i]) { return i; }
+    }
+    return -1;
+  }
+};
 
 // words taken from Mathematica's WordList[]
 std::vector < std::string > five_letter_words = {
