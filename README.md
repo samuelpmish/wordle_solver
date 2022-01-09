@@ -74,6 +74,5 @@ are used to determine how many possible words remain after the first guess. The 
 guess. Using this output, the word "aloes" is the best in the sense of producing the smallest pool of words to choose from after the first guess (in the
 worst-case scenario).
 
-Of course, this is just a heuristic, as not all lexicons of n words are equally "easy" to solve. In practice, though, guessing "aloes" first every time
+Of course, this is just a heuristic, as two equally-sized lexicons are not equally "easy" to solve. In practice, though, guessing "aloes" first every time
 does seem to be a respectable strategy.
-respectable strategy
