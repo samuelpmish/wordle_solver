@@ -49,24 +49,31 @@ found truth in 3 guess(es)
 
 ```
 % ./wordle_solver
-guess 1: slate
-guess 2: crank
+guess 1: aloes
+guess 2: print
 guess 3: aback
 found aback in 4 guess(es)
-guess 1: slate
-guess 2: grunt
-guess 3: abaft
+guess 1: aloes
+guess 2: print
+guess 3: aback
 found abaft in 4 guess(es)
-guess 1: slate
-guess 2: chess
-guess 3: urban
-found abase in 4 guess(es)
-guess 1: slate
-guess 2: crush
-guess 3: awing
-found abash in 4 guess(es)
-guess 1: slate
-guess 2: argon
-found abate in 3 guess(es)
+guess 1: aloes
+guess 2: bound
+found abase in 3 guess(es)
+guess 1: aloes
+guess 2: bight
+found abash in 3 guess(es)
 ...
 ```
+
+# Finding the "best" first guess
+The file "word_data.txt" contains information about how effective each 5-letter word is as a starting guess. 
+
+Each starting guess was tried against all the words in the lexicon, and the clues from the output (which tiles are matched, misplaced, unused) 
+are used to determine how many possible words remain after the first guess. The number next to each guess is the worst-case results for that 
+guess. Using this output, the word "aloes" is the best in the sense of producing the smallest pool of words to choose from after the first guess (in the
+worst-case scenario).
+
+Of course, this is just a heuristic, as not all lexicons of n words are equally "easy" to solve. In practice, though, guessing "aloes" first every time
+does seem to be a respectable strategy.
+respectable strategy
