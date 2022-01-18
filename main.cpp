@@ -3,6 +3,7 @@
 #include <iostream>
 #include <algorithm>
 
+#include "small_array.h"
 #include "word_list.h"
 
 using Clue = std::pair< int, char >;
@@ -10,11 +11,13 @@ using Clue = std::pair< int, char >;
 struct State {
   std::set < Clue > matched; 
   std::set < Clue > misplaced; 
-  std::set < char > unused; 
+  uint32_t unused; 
 
   // check if word satisfies the given information about 
   // which characters are matched, misplaced or unused
   bool is_consistent_with(Word word) const {
+
+    uint32_t mask = letter_mask(word);
 
     // the given word must match certain letters at specific locations
     for (auto [i, c] : matched) { 
@@ -22,7 +25,7 @@ struct State {
     }
 
     // the given word must not contain certain letters
-    for (auto c : unused) { if (word.contains(c)) return false; }
+    if (mask & unused) return false;
 
     // the given word must contain certain letters, but not in the given location
     for (auto [i, c] : misplaced) { 
@@ -58,7 +61,7 @@ State combine(State a, State b) {
   return {
     matched,
     (a.misplaced + b.misplaced) - matched,
-    a.unused + b.unused,
+    a.unused | b.unused
   };
 }
 
@@ -76,8 +79,8 @@ void print(State s) {
   std::cout << std::endl;
 
   std::cout << "unused: ";
-  for (auto c : s.unused) {
-    std::cout << c << " ";
+  for (int i = 0; i < 26; i++) {
+    if (s.unused & (1 << i)) std::cout << 'a' + i << " ";
   }
   std::cout << std::endl;
 }
@@ -90,6 +93,12 @@ auto select(const std::vector < Word > & words, const State & s) {
     }
   } 
   return filtered;
+}
+
+size_t num_remaining_words(const std::vector < Word > & words, const State & s) {
+  size_t remaining = 0;
+  for (auto & word : words) { remaining += s.is_consistent_with(word); } 
+  return remaining;
 }
 
 auto check(Word answer, Word guess) {
@@ -107,7 +116,7 @@ auto check(Word answer, Word guess) {
   for (int i = 0; i < word_length; i++) {
     int location = answer.find(guess[i]);
     if (location == -1) {
-      feedback.unused.insert(guess[i]);
+      feedback.unused |= 1 << (guess[i] - 'a');
     } else {
       if (!matching[location]) {
         feedback.misplaced.insert({i, guess[i]});
@@ -125,7 +134,7 @@ float new_information(State clues, Word word, float (&weights)[word_length][26])
   for (int i = 0; i < word_length; i++) {
     char c = word[i];
     if (already_used.count(c) == 0) {
-      score += weights[i][word[i] - 'a'];
+      score += weights[i][c - 'a'];
       already_used.insert(c);
     }
   }
@@ -177,8 +186,7 @@ auto best_guess_brute_force(const std::vector < Word > & possible_words, State c
     size_t remaining = 0;
     for (auto answer : possible_words) {
       auto new_clues = combine(clues, check(answer, word));
-      auto remaining_words = select(possible_words, new_clues);
-      remaining = std::max(remaining, remaining_words.size());
+      remaining = std::max(remaining, num_remaining_words(possible_words, new_clues));
     }
 
     if (remaining < fewest_remaining) {
@@ -235,6 +243,7 @@ int wordle_solve(Word answer, bool debug_print = false) {
 
 int main(int argc, char * argv[]) {
 
+#if 1
   auto possible_words = five_letter_words;
 
   State clues{};
@@ -258,5 +267,28 @@ int main(int argc, char * argv[]) {
       std::cout << i << ": " << counts[i] << std::endl;
     }
   }
+#else
+
+  State clues {
+    {{0, 'a'}, {3, 'e'}, {4, 'y'}},
+    {},
+    {'d', 'i', 'r', 't', 'm', 'p', 'l', 'o', 's'}
+  };
+
+  auto possible_words = select(five_letter_words, clues);
+
+  std::cout << possible_words.size() << " remaining words: " << std::endl;
+  int count = 0;
+  for (auto word : possible_words) {
+    std::cout << word << ' ';
+    if (++count % 16 == 0) std::cout << std::endl;
+  }
+  std::cout << std::endl;
+  std::cout << std::endl;
+  
+  std::cout << best_guess_brute_force(possible_words, clues) << std::endl;
+  
+
+#endif
 
 }
