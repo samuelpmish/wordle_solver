@@ -1,17 +1,21 @@
 #include <array>
-#include <set>
+#include <vector>
 #include <iostream>
 #include <algorithm>
 
-#include "small_array.h"
-#include "word_list.h"
+#include "word.h"
 
-using Clue = std::pair< int, char >;
+extern std::vector < Word > five_letter_words;
 
 struct State {
-  std::set < Clue > matched; 
-  std::set < Clue > misplaced; 
+
+  char matched[word_length]; 
+  uint32_t misplaced[word_length];
   uint32_t unused; 
+  uint32_t used;
+
+  // '?' here will denote we haven't found a match
+  State() : matched{'?', '?', '?', '?', '?'}, misplaced{}, unused{}, used{}{}
 
   // check if word satisfies the given information about 
   // which characters are matched, misplaced or unused
@@ -19,68 +23,75 @@ struct State {
 
     uint32_t mask = letter_mask(word);
 
-    // the given word must match certain letters at specific locations
-    for (auto [i, c] : matched) { 
-      if (word[i] != c) return false; 
-    }
+    // the given word must contain certain letters
+    if ((mask & used) != used) return false;
 
-    // the given word must not contain certain letters
+    // and not contain others
     if (mask & unused) return false;
 
-    // the given word must contain certain letters, but not in the given location
-    for (auto [i, c] : misplaced) { 
-      if (word[i] == c) return false; 
-      if (!word.contains(c)) return false; 
+    // and also satisfy certain matching conditions
+    for (int i = 0; i < word_length; i++) {
+      char c = word[i];
+
+      // matched letters must be in certain locations
+      if (matched[i] != '?' && c != matched[i]) return false; 
+
+      // misplaced letters must not be in certain locations
+      if (letter_mask(c) & misplaced[i]) return false; 
     }
 
     return true;
   }
 };
 
-// set union
-template < typename T >
-std::set< T > operator+(const std::set< T > & a, const std::set < T > & b) {
-  std::set<T> result = a;
-  result.insert(b.begin(), b.end());
-  return result;
-}
-
-// set difference
-template < typename T >
-std::set< T > operator-(const std::set< T > & a, const std::set < T > & b) {
-  std::set<T> result;
-  std::set_difference(
-      a.begin(), a.end(),
-      b.begin(), b.end(),
-      std::inserter(result, result.end()));
-  return result;
-}
-
 State combine(State a, State b) {
-  auto matched = a.matched + b.matched;
-  return {
-    matched,
-    (a.misplaced + b.misplaced) - matched,
-    a.unused | b.unused
-  };
+
+  State combined{};
+
+  for (int i = 0; i < word_length; i++) {
+
+    // matched will be '?' (ASCII code: 63) when unknown, 
+    // and a lower case character (ASCII codes: 97-122) when known. 
+    // So, taking the max will select the known value, 
+    // if it exists, or leave a '?' otherwise
+    combined.matched[i] = std::max(a.matched[i], b.matched[i]);
+
+    uint32_t mask = letter_mask(combined.matched[i]);
+
+    combined.misplaced[i] = (a.misplaced[i] | b.misplaced[i]) & ~mask;
+
+    combined.used |= combined.misplaced[i] | mask;
+
+  }
+
+  combined.unused = a.unused | b.unused; 
+
+  return combined;
 }
 
 void print(State s) {
   std::cout << "matched: ";
-  for (auto [i, c] : s.matched) {
-    std::cout << '{' << c << ", " << i << "} ";
+  for (int i = 0; i < word_length; i++) {
+    if (s.matched[i] != '?') {
+      std::cout << '{' << s.matched[i] << ", " << i << "} ";
+    }
   }
   std::cout << std::endl;
 
   std::cout << "misplaced: ";
-  for (auto [i, c] : s.misplaced) {
-    std::cout << '{' << c << ", " << i << "} ";
+  for (int i = 0; i < word_length; i++) {
+    auto mask = s.misplaced[i];
+    for (int j = 0; j < 26; j++) {
+      if (mask & (uint32_t(1) << j)) {
+        std::cout << '{' << char('a' + j) << ", " << i << "} ";
+      }
+    }
   }
   std::cout << std::endl;
 
   std::cout << "unused: ";
   for (int i = 0; i < 26; i++) {
-    if (s.unused & (1 << i)) std::cout << 'a' + i << " ";
+    if (s.unused & (uint32_t(1) << i)) std::cout << char('a' + i) << " ";
   }
   std::cout << std::endl;
 }
@@ -109,72 +120,22 @@ auto check(Word answer, Word guess) {
   // first get all the matched letters
   for (int i = 0; i < word_length; i++) {
     matching[i] = (answer[i] == guess[i]);
-    if (matching[i]) feedback.matched.insert({i, answer[i]});
+    if (matching[i]) feedback.matched[i] = answer[i];
   }
 
   // then get all the unused / misplaced letters
   for (int i = 0; i < word_length; i++) {
     int location = answer.find(guess[i]);
     if (location == -1) {
-      feedback.unused |= 1 << (guess[i] - 'a');
+      feedback.unused |= letter_mask(guess[i]);
     } else {
       if (!matching[location]) {
-        feedback.misplaced.insert({i, guess[i]});
+        feedback.misplaced[i] |= letter_mask(guess[i]);
       }
     }
   }
 
   return feedback;
-}
-
-float new_information(State clues, Word word, float (&weights)[word_length][26]) {
-  std::set<char> already_used{};
-
-  float score = 0;
-  for (int i = 0; i < word_length; i++) {
-    char c = word[i];
-    if (already_used.count(c) == 0) {
-      score += weights[i][c - 'a'];
-      already_used.insert(c);
-    }
-  }
-
-  return score;
-}
-
-auto best_guess(std::vector < Word > possible_words, State clues) {
-
-  bool already_matched[word_length]{};
-  for (auto [i, c] : clues.matched) { already_matched[i] = true; }
-
-  const float delta = 1.0 / possible_words.size();
-
-  float weights[word_length][26] {};
-  for (auto word : possible_words) {
-    for (int i = 0; i < word_length; i++) {
-      if (already_matched[i]) continue;
-      weights[i][word[i] - 'a'] += delta;
-      for (int j = 0; j < word_length; j++) {
-        weights[j][word[i] - 'a'] += 0.25 * delta;
-      }
-    }
-  }
-
-  for (auto [i, c] : clues.matched) { weights[i][c - 'a'] = 0.0; }
-  for (auto [i, c] : clues.misplaced) { weights[i][c - 'a'] = 0.0; }
-
-  float best_score = -1.0;
-  Word best_word;
-
-  for (auto word : five_letter_words) {
-    float score = new_information(clues, word, weights);
-    if (best_score < score) {
-      best_score = score;
-      best_word = word;
-    }
-  }
-
-  return best_word;
 }
 
 auto best_guess_brute_force(const std::vector < Word > & possible_words, State clues) {
@@ -243,7 +204,6 @@ int wordle_solve(Word answer, bool debug_print = false) {
 
 int main(int argc, char * argv[]) {
 
-#if 1
   auto possible_words = five_letter_words;
 
   State clues{};
@@ -267,28 +227,5 @@ int main(int argc, char * argv[]) {
       std::cout << i << ": " << counts[i] << std::endl;
     }
   }
-#else
-
-  State clues {
-    {{0, 'a'}, {3, 'e'}, {4, 'y'}},
-    {},
-    {'d', 'i', 'r', 't', 'm', 'p', 'l', 'o', 's'}
-  };
-
-  auto possible_words = select(five_letter_words, clues);
-
-  std::cout << possible_words.size() << " remaining words: " << std::endl;
-  int count = 0;
-  for (auto word : possible_words) {
-    std::cout << word << ' ';
-    if (++count % 16 == 0) std::cout << std::endl;
-  }
-  std::cout << std::endl;
-  std::cout << std::endl;
-  
-  std::cout << best_guess_brute_force(possible_words, clues) << std::endl;
-  
-
-#endif
 
 }

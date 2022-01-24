@@ -2,11 +2,14 @@
 a small commandline tool for solving [Wordle](https://www.powerlanguage.co.uk/wordle/)
 
 # Build
-Compile with a suitable C++17 compiler,
+Compile with a suitable C++17 compiler, using idiomatic CMake:
 
 ```
-g++ main.cpp -std=c++17 -O3 -o wordle_solver
+cd /path/to/wordle_solver
+cmake . -B build -DCMAKE_BUILD_TYPE=Release
 ```
+
+note: please build `Release`, compiling without optimization hurts performance by ~10x
 
 # Run
 This tool supports two modes:

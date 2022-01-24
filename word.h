@@ -1,4 +1,5 @@
 #include <string>
+#include <iostream>
 #include <algorithm> // for std::copy
 
 constexpr size_t word_length = 5;
@@ -29,14 +30,21 @@ struct Word {
   const char & operator[](int i) const { return data[i]; }
 };
 
-uint32_t letter_mask(Word w) {
+inline uint32_t letter_mask(Word w) {
   constexpr uint32_t one = 1;
   uint32_t mask{}; 
   for (auto c : w.data) mask |= (one << (c - 'a')); 
   return mask;
 }
 
-std::ostream & operator<<(std::ostream & out, Word w) {
+inline uint32_t letter_mask(char c) { 
+  if (c == '?') return uint32_t(0);
+  else return uint32_t(1) << (c - 'a'); 
+}
+
+
+
+inline std::ostream & operator<<(std::ostream & out, Word w) {
   for (auto c : w.data) {
     out << c;
   } 
