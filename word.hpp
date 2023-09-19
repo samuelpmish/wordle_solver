@@ -42,8 +42,6 @@ inline uint32_t letter_mask(char c) {
   else return uint32_t(1) << (c - 'a'); 
 }
 
-
-
 inline std::ostream & operator<<(std::ostream & out, Word w) {
   for (auto c : w.data) {
     out << c;

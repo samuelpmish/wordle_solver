@@ -1,48 +1,15 @@
-#include <array>
-#include <vector>
-#include <iostream>
-#include <algorithm>
+#include "wordle_tools.hpp"
 
-#include "word.h"
+#include "color.hpp"
 
-extern std::vector < Word > five_letter_words;
+#include <random>
 
-struct State {
-
-  char matched[word_length]; 
-  uint32_t misplaced[word_length];
-  uint32_t unused; 
-  uint32_t used;
-
-  // '?' here will denote we haven't found a match
-  State() : matched{'?', '?', '?', '?', '?'}, misplaced{}, unused{}, used{}{}
-
-  // check if word satisfies the given information about 
-  // which characters are matched, misplaced or unused
-  bool is_consistent_with(Word word) const {
-
-    uint32_t mask = letter_mask(word);
-
-    // the given word must contain certain letters
-    if ((mask & used) != used) return false;
-
-    // and not contain others
-    if (mask & unused) return false;
-
-    // and also satisfy certain matching conditions
-    for (int i = 0; i < word_length; i++) {
-      char c = word[i];
-
-      // matched letters must be in certain locations
-      if (matched[i] != '?' && c != matched[i]) return false; 
-
-      // misplaced letters must not be in certain locations
-      if (letter_mask(c) & misplaced[i]) return false; 
-    }
-
-    return true;
-  }
-};
+Word random(const std::vector< Word > & words) {
+  static unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+  static std::default_random_engine generator(seed);
+  static std::uniform_int_distribution<int> distribution(0, words.size() - 1);
+  return words[distribution(generator)];
+}
 
 State combine(State a, State b) {
 
@@ -96,7 +63,7 @@ void print(State s) {
   std::cout << std::endl;
 }
 
-auto select(const std::vector < Word > & words, const State & s) {
+std::vector< Word > select(const std::vector < Word > & words, const State & s) {
   std::vector < Word > filtered;
   for (auto & word : words) {
     if (s.is_consistent_with(word)) {
@@ -110,6 +77,27 @@ size_t num_remaining_words(const std::vector < Word > & words, const State & s) 
   size_t remaining = 0;
   for (auto & word : words) { remaining += s.is_consistent_with(word); } 
   return remaining;
+}
+
+std::array<Clue, 5> get_clues(Word answer, Word guess) {
+  std::array<Clue, 5> output;
+
+  for (int i = 0; i < word_length; i++) {
+    if (guess[i] == answer[i]) {
+      output[i] = GREEN;
+    } else {
+      bool misplaced = false;
+      for (int j = 0; j < word_length; j++) {
+        if (guess[i] == answer[j] && guess[j] != answer[j]) {
+          misplaced = true;
+          break;
+        }
+      }
+      output[i] = misplaced ? YELLOW : GRAY;
+    }
+  }
+
+  return output;
 }
 
 auto check(Word answer, Word guess) {
@@ -143,7 +131,7 @@ auto best_guess_brute_force(const std::vector < Word > & possible_words, State c
   float fewest_remaining = possible_words.size();
   Word best_word;
 
-  for (auto word : five_letter_words) {
+  for (auto word : all_words) {
     size_t remaining = 0;
     for (auto answer : possible_words) {
       auto new_clues = combine(clues, check(answer, word));
@@ -160,11 +148,11 @@ auto best_guess_brute_force(const std::vector < Word > & possible_words, State c
 
 }
 
-int wordle_solve(Word answer, bool debug_print = false) {
+int wordle_solve(Word answer, bool debug_print) {
 
   State clues{};
 
-  auto possible_words = five_letter_words;
+  auto possible_words = all_words;
 
   Word guess = "aloes";
 
@@ -202,30 +190,26 @@ int wordle_solve(Word answer, bool debug_print = false) {
 
 }
 
-int main(int argc, char * argv[]) {
-
-  auto possible_words = five_letter_words;
-
-  State clues{};
-
-  if (argc == 2) { 
-    std::string answer = argv[1];
-    if (answer.size() != 5) {
-      std::cout << "must enter a 5-letter word" << std::endl;
-      exit(1);
-    }
-    bool debug_print;
-    wordle_solve(answer, debug_print = true);
-  } else {
-
-    int counts[10]{};
-    for (auto word : five_letter_words) {
-      counts[wordle_solve(word)]++;
-    }
-
-    for (int i = 0; i < 10; i++) {
-      std::cout << i << ": " << counts[i] << std::endl;
-    }
-  }
-
+void delete_line() {
+  std::cout << "\x1b[1A\x1b[2K" << std::flush;
 }
+
+void print(std::array< Clue, 5 > clues, Word guess) {
+  for (int i = 0; i < word_length; i++) {
+    std::cout << colors::bold << colors::grey;
+    if (clues[i] == GRAY) std::cout << colors::on_bright_grey;
+    if (clues[i] == YELLOW) std::cout << colors::on_yellow;
+    if (clues[i] == GREEN) std::cout << colors::on_green;
+    std::cout << guess[i];
+  }
+  std::cout << colors::reset << std::endl;
+};
+
+std::ostream& operator<<(std::ostream & out, std::array< Clue, 5 > clues) {
+  for (int i = 0; i < word_length; i++) {
+    if (clues[i] == GRAY) out << "⬜";
+    if (clues[i] == YELLOW) out << "🟨";
+    if (clues[i] == GREEN) out << "🟩";
+  }
+  return out;
+};
