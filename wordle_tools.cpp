@@ -100,7 +100,7 @@ std::array<Clue, 5> get_clues(Word answer, Word guess) {
   return output;
 }
 
-auto check(Word answer, Word guess) {
+State check(Word answer, Word guess) {
   State feedback{};
 
   bool matching[word_length];

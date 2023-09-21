@@ -1,5 +1,8 @@
 #include "wordle_tools.hpp"
 
+#include "timer.hpp"
+
+#include <algorithm>
 #include <unordered_map>
 
 struct array_hasher {
@@ -23,12 +26,24 @@ clue_count get_counts(const std::vector< Word > & words, Word guess) {
 
 int main() {
 
-  Word guess = "aloes";
+  std::vector< std::tuple< float, std::string > > results;
+  results.reserve(all_words.size());
+  for (auto guess : all_words) {
+    clue_count counts = get_counts(all_answers, guess);
 
-  clue_count counts = get_counts(all_answers, guess);
+    float entropy = 0.0;
+    for (auto & [k, v] : counts) {
+      float p = float(v) / all_answers.size();
+      entropy -= p * log2f(p);
+    }
 
-  for (auto & [k, v] : counts) {
-    std::cout << k << ": " << v << std::endl;
+    results.push_back({entropy, guess.data});
+  }
+
+  std::sort(results.begin(), results.end());
+
+  for (auto & [entropy, word] : results) {
+    std::cout << word << ": " << entropy << std::endl;
   }
 
 }
